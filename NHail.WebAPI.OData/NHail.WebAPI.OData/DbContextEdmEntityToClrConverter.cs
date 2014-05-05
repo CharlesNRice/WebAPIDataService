@@ -14,10 +14,12 @@ using NHail.WebAPI.OData.Interfaces;
 
 namespace NHail.WebAPI.OData
 {
-    public class DbContextEdmEntityToClrConverter : IEdmEntityToClrConverter
+    public class DbContextEdmEntityToClrConverter : IEdmEntityToClrConverter, IInjectServiceLocator
     {
         private readonly static ConcurrentDictionary<IEdmEntityType, Type> _cachedConversions =
             new ConcurrentDictionary<IEdmEntityType, Type>();
+
+        private IServiceLocator _serviceLocator;
 
         public Type AsClrType<TSource>(TSource source, IEdmEntityType edmEntityType)
         {
@@ -63,12 +65,17 @@ namespace NHail.WebAPI.OData
         {
             if (assembly == null)
             {
-                var resolver = new DefaultAssembliesResolver();
+                var resolver = _serviceLocator.ServiceLocator<IAssembliesResolver>();
                 return resolver.GetAssemblies()
                                .Select(a => a.GetType(nameOfType, false, ignoreCase))
                                .FirstOrDefault(t => t != null);
             }
             return assembly.GetType(nameOfType, false, ignoreCase);
+        }
+
+        public void SetServiceLocator(IServiceLocator serviceLocator)
+        {
+            _serviceLocator = serviceLocator;
         }
     }
 }

@@ -4,8 +4,9 @@ using System.Data.Entity;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using NHail.WebAPI.OData.Tests.CodeFirstPocos;
+//using NHail.WebAPI.OData.Tests.CodeFirstPocos;
 using NHail.WebAPI.OData.Tests.Contexts;
+using Pocos;
 
 namespace NHail.WebAPI.OData.Tests
 {

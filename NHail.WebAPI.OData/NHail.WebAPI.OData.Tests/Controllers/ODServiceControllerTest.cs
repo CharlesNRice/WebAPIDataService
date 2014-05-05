@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Data.Services.Client;
 using System.Data.Services.Common;
@@ -20,9 +21,10 @@ using Microsoft.Owin.Hosting;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NHail.WebAPI.OData;
 using NHail.WebAPI.OData.Controllers;
-using NHail.WebAPI.OData.Tests.CodeFirstPocos;
+//using NHail.WebAPI.OData.Tests.CodeFirstPocos;
 using NHail.WebAPI.OData.Tests.Contexts;
 using Newtonsoft.Json.Linq;
+using Pocos;
 
 namespace NHail.WebAPI.OData.Tests.Controllers
 {
@@ -133,6 +135,28 @@ namespace NHail.WebAPI.OData.Tests.Controllers
 
             var content = await response.Content.ReadAsStringAsync();
             Assert.IsTrue(content.Contains("ITEM1"));
+        }
+
+        [TestMethod]
+        public async Task CheckProjection()
+        {
+            var context = new DataServiceContext(new Uri(ServiceAddress), DataServiceProtocolVersion.V3)
+            {
+                MergeOption = MergeOption.OverwriteChanges
+            };
+            var query = (DataServiceQuery)context.CreateQuery<Customers>("Customers").Select(c => new
+                {
+                    c.CustomerId,
+                    c.Company,
+                    c.State
+                });
+            var response =
+                await
+                Task.Factory.FromAsync<IEnumerable>(query.BeginExecute, query.EndExecute, null)
+                   .ConfigureAwait(false);
+            var check = ((IEnumerable<object>) response).ToArray();
+            
+             Assert.AreEqual(3, check.Length);
         }
     }
 }

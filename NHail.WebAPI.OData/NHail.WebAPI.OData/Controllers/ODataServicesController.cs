@@ -12,6 +12,7 @@ using System.Threading;
 using System.Web;
 using System.Web.Http;
 using System.Web.Http.Controllers;
+using System.Web.Http.Dispatcher;
 using System.Web.Http.OData.Formatter;
 using System.Web.Http.OData.Query;
 using System.Web.Http.OData.Routing;
@@ -28,19 +29,12 @@ using NHail.WebAPI.OData.Interfaces;
 
 namespace NHail.WebAPI.OData.Controllers
 {
-    public abstract class ODataServicesController<TSource> : ODataMetadataController
+    public abstract class ODataServicesController<TSource> : ODataMetadataController, IServiceLocator
     {
         public abstract string ODataRoute { get; }
         
         static ODataServicesController()
         {
-
-            _firstOrDefault =
-                typeof (Queryable).GetMethods(BindingFlags.Static | BindingFlags.Public)
-                                  .First(m => m.Name == "FirstOrDefault" && m.GetParameters().Count() == 1)
-                                  .MethodHandle;
-                                
-
             _processRequest =
                 typeof(ODataServicesController<TSource>).GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
                                                          .First(
@@ -52,6 +46,7 @@ namespace NHail.WebAPI.OData.Controllers
             ServiceLoctorConfiguration<IEdmModelFactory>(() => new DbContextEdmModel());
             ServiceLoctorConfiguration<IEdmEntityToClrConverter>(() => new DbContextEdmEntityToClrConverter());
             ServiceLoctorConfiguration<IQueryRootProvider>(() => new DbContextQueryRoot());
+            ServiceLoctorConfiguration<IAssembliesResolver>(() => new DefaultAssembliesResolver());
             
             // Default for the odata query
             oDataQuerySettings = new ODataQuerySettings();
@@ -60,6 +55,7 @@ namespace NHail.WebAPI.OData.Controllers
         protected ODataServicesController()
         {
             SetServiceLocator();
+            
             // Setup data source to get resolved first time needed.
             _currentDataSource = new Lazy<TSource>(CreateDataSource, LazyThreadSafetyMode.ExecutionAndPublication);
         }
@@ -67,8 +63,17 @@ namespace NHail.WebAPI.OData.Controllers
         protected static ODataQuerySettings oDataQuerySettings { get; private set; }
 
         private static readonly RuntimeMethodHandle _processRequest;
-        private static readonly RuntimeMethodHandle _firstOrDefault;
 
+        private static readonly IDictionary<EdmTypeKind, Type> _edmTypeKindToInterface = new Dictionary<EdmTypeKind, Type>()
+            {
+                {EdmTypeKind.Collection, typeof(IEdmCollectionType)},
+                {EdmTypeKind.Complex, typeof(IEdmComplexType)},
+                {EdmTypeKind.Entity, typeof(IEdmEntityType)},
+                {EdmTypeKind.EntityReference, typeof(IEdmEntityTypeReference)},
+                {EdmTypeKind.Enum, typeof(IEdmEnumType)},
+                {EdmTypeKind.Primitive, typeof(IEdmPrimitiveType)},
+                {EdmTypeKind.Row, typeof(IEdmRowType)}
+            };
 
         private static ConcurrentDictionary<KeyValuePair<IEdmEntityType, Type>, Delegate> _typeToGeneric =
             new ConcurrentDictionary<KeyValuePair<IEdmEntityType, Type>, Delegate>();
@@ -96,25 +101,48 @@ namespace NHail.WebAPI.OData.Controllers
         #endregion
 
         #region ServiceLocator
-
-        private static readonly IDictionary<Type, Lazy<object>> _serviceLocatorDefaults = new Dictionary<Type, Lazy<object>>();
+        private static readonly IDictionary<Type, Func<object>> _serviceLocatorDefaults =
+            new Dictionary<Type, Func<object>>();
+        private IDictionary<Type, Lazy<object>> _serviceLocatorValues;
 
         protected static void ServiceLoctorConfiguration<TInterface>(Func<TInterface> valueFactory)
             where TInterface : class
         {
-            _serviceLocatorDefaults[typeof(TInterface)] = new Lazy<object>(valueFactory);
+            _serviceLocatorDefaults[typeof(TInterface)] = valueFactory;
         }
-
 
         private Func<Type, object> _serviceLocator;
 
-        private T ServiceLocator<T>() where T : class
+        public T ServiceLocator<T>() where T : class
         {
             return _serviceLocator(typeof(T)) as T;
         }
 
+        private IDictionary<Type, Lazy<object>> buildServiceLocator()
+        {
+            var serviceLocator = new Dictionary<Type, Lazy<object>>();
+            foreach (var kv in _serviceLocatorDefaults)
+            {
+                Func<object> wrapper = () =>
+                    {
+                        var value = kv.Value();
+                        var setServiceLocator = value as IInjectServiceLocator;
+                        if (setServiceLocator != null)
+                        {
+                            setServiceLocator.SetServiceLocator(this);
+                        }
+                        return value;
+                    };
+                serviceLocator.Add(kv.Key, new Lazy<object>(wrapper));
+            }
+            return serviceLocator;
+        }
+
         private void SetServiceLocator()
         {
+            // Make a per instance copy of the ServiceLocator defaults
+            _serviceLocatorValues = buildServiceLocator();
+
             // check if datasource or controller implements IServiceProvider;
             var dataSourceResolver = (typeof(IServiceProvider).IsAssignableFrom(typeof(TSource)));
             var controllerResolver = (typeof(IServiceProvider).IsAssignableFrom(GetType()));
@@ -131,9 +159,9 @@ namespace NHail.WebAPI.OData.Controllers
                         {
                             result = DependencyResolver.Current.GetService(type);
                         }
-                        if (result == null && _serviceLocatorDefaults.ContainsKey(type))
+                        if (result == null && _serviceLocatorValues.ContainsKey(type))
                         {
-                            result = _serviceLocatorDefaults[type].Value;
+                            result = _serviceLocatorValues[type].Value;
                         }
                     }
                     return result;
@@ -148,9 +176,9 @@ namespace NHail.WebAPI.OData.Controllers
                     {
                         result = DependencyResolver.Current.GetService(type);
                     }
-                    if (result == null && _serviceLocatorDefaults.ContainsKey(type))
+                    if (result == null && _serviceLocatorValues.ContainsKey(type))
                     {
-                        result = _serviceLocatorDefaults[type].Value;
+                        result = _serviceLocatorValues[type].Value;
                     }
                     return result;
                 };
@@ -164,10 +192,10 @@ namespace NHail.WebAPI.OData.Controllers
                     {
                         result = DependencyResolver.Current.GetService(type);
                     }
-                    if (result == null && _serviceLocatorDefaults.ContainsKey(type))
+                    if (result == null && _serviceLocatorValues.ContainsKey(type))
                     {
-                       
-                        result = _serviceLocatorDefaults[type].Value;
+
+                        result = _serviceLocatorValues[type].Value;
                     }
                     return result;
                 };
@@ -177,9 +205,9 @@ namespace NHail.WebAPI.OData.Controllers
                 _serviceLocator = type =>
                 {
                     var result = DependencyResolver.Current.GetService(type);
-                    if (result == null && _serviceLocatorDefaults.ContainsKey(type))
+                    if (result == null && _serviceLocatorValues.ContainsKey(type))
                     {
-                        result = _serviceLocatorDefaults[type].Value;
+                        result = _serviceLocatorValues[type].Value;
                     }
                     return result;
                 };
@@ -335,33 +363,6 @@ namespace NHail.WebAPI.OData.Controllers
                 return interception.Intercept<TEntity>();
             }
             return null;
-        }
-
-        private HttpResponseMessage QueryEntity(IEdmEntityType edmType)
-        {
-            var entityType = GetIEdmTypeToCLRType(edmType);
-            // Switch from system Type to generic type
-            var process = (Func<IEdmEntityType, IQueryable>)
-                          _typeToGeneric.GetOrAdd(new KeyValuePair<IEdmEntityType, Type>(edmType, entityType),
-                                                  pair =>
-                                                  {
-                                                      var method = ((MethodInfo)
-                                                                    MethodBase.GetMethodFromHandle(
-                                                                        _processRequest, GetType().TypeHandle))
-                                                          .MakeGenericMethod(pair.Value);
-                                                      return
-                                                          Delegate.CreateDelegate(
-                                                              typeof(Func<IEdmEntityType, IQueryable>), this,
-                                                              method);
-                                                  });
-
-            var query = process(edmType);
-            var response = Request.CreateResponse();
-            var odataMediaTypeFormatter = GetFormatter(query.ElementType);
-            var formatter = odataMediaTypeFormatter.GetPerRequestFormatterInstance(query.ElementType, Request, null);
-
-            response.Content = new ObjectContent(typeof(IEdmModel), GetMetadata(), formatter);
-            return response;
         }
 
         private IHttpActionResult GenerateServiceDocument()
@@ -566,7 +567,7 @@ namespace NHail.WebAPI.OData.Controllers
             var segment = path.Segments[0];
             var edmType = segment.GetEdmType(null);
             var edmCollectionType = edmType as IEdmCollectionType;
-            if (edmType == null || edmCollectionType == null)
+            if (edmType == null || edmCollectionType == null || !_edmTypeKindToInterface.ContainsKey(path.EdmType.TypeKind))
             {
                 throw new WebAPIDataServiceException("Can not resolve OData Path", new ODataUnrecognizedPathException());
             }
@@ -576,6 +577,7 @@ namespace NHail.WebAPI.OData.Controllers
             {
                 edmType = segment.GetEdmType(edmType);
                 segment = path.Segments[i];
+                // wish this would be an enum.  Don't know if I have all the possibilities set here
                 switch (segment.SegmentKind)
                 {
                     case "key":
@@ -606,59 +608,40 @@ namespace NHail.WebAPI.OData.Controllers
                 }
             }
 
-            // setup to have web api odata take over
-            var edmEntityType = GetIEdmTypeToCLRType(GetEdmEntityType(edmType));
-
-            var model = GetMetadata();
-            var queryContext = new ODataQueryContext(model, edmEntityType);
-            var queryOptions = new ODataQueryOptions(queryContext, Request);
-
-            //ToDo this does the default Web API filtering but would like to get more control over it
-            query = queryOptions.ApplyTo(query, new ODataQuerySettings(oDataQuerySettings));
-
-
-            //ToDo there has to be a better way but this works for now
-            //ToDo still missing complex types
-            IEdmType resultEdmType;
-            resultEdmType = path.EdmType as IEdmCollectionType;
-            if (resultEdmType != null)
+            var contentType = _edmTypeKindToInterface[path.EdmType.TypeKind];
+            if (contentType == typeof (IEdmCollectionType))
             {
-                return new ODataHttpActionResult(this, query, typeof (IEdmCollectionType),
-                                                  typeof (IEnumerable<>).MakeGenericType(query.ElementType));
+                // setup to have web api odata take over
+                var edmEntityType = GetIEdmTypeToCLRType(GetEdmEntityType(path.EdmType));
+
+                var model = GetMetadata();
+                var queryContext = new ODataQueryContext(model, edmEntityType);
+                var queryOptions = new ODataQueryOptions(queryContext, Request);
+
+                //ToDo this does the default Web API filtering but would like to get more control over it
+                query = queryOptions.ApplyTo(query, new ODataQuerySettings(oDataQuerySettings));
+
+
+                return new ODataHttpActionResult(this, query, contentType,
+                                                 typeof (IEnumerable<>).MakeGenericType(query.ElementType));
             }
-            resultEdmType = path.EdmType as IEdmEntityType;
-            if (resultEdmType!= null)
-            {
-
-                // Not excited about this code but works for now
-                var firstOrDeafult =
-                    ((MethodInfo) MethodBase.GetMethodFromHandle(_firstOrDefault)).MakeGenericMethod(query.ElementType);
-                var results = firstOrDeafult.Invoke(null, new[] {query});
-
-                return new ODataHttpActionResult(this, results, typeof (IEdmEntityType),
+            return new ODataHttpActionResult(this, FirstOrDefault(query), contentType,
                                                  query.ElementType);
-            }
-            if (path.EdmType.TypeKind == EdmTypeKind.Primitive)
-            {
-                // Not excited about this code but works for now
-                var firstOrDeafult =
-                    ((MethodInfo)MethodBase.GetMethodFromHandle(_firstOrDefault)).MakeGenericMethod(query.ElementType);
-                var results = firstOrDeafult.Invoke(null, new[] { query });
-
-                return new ODataHttpActionResult(this, results, typeof(IEdmPrimitiveType),
-                                                 query.ElementType);
-            }
-
-            return BadRequest("Not Implemented");
-
         }
 
-        private MediaTypeFormatter GetFormatter(Type objType)
+        // have just system type use use IEnumberable to create the first one
+        private object FirstOrDefault(IQueryable queryable)
         {
-            //ToDo Generate error if we can't match on the requested content type
-            var conneg = Configuration.Services.GetContentNegotiator();
-            var result = conneg.Negotiate(objType, Request, Configuration.Formatters);
-            return result.Formatter;
+            var enumerator = queryable.GetEnumerator();
+            {
+                if (enumerator.MoveNext())
+                {
+                    return enumerator.Current;
+                }
+            }
+
+            var type = queryable.ElementType;
+            return type.IsValueType ? Activator.CreateInstance(type) : null;
         }
 
         protected override void Dispose(bool disposing)

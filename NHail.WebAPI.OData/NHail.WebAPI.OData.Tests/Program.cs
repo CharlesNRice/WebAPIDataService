@@ -12,18 +12,7 @@ namespace NHail.WebAPI.OData.Tests
     {
         private static void Main(string[] args)
         {
-            try
-            {
-                using (var context = new CodeFirstContext())
-                {
 
-                }
-            }
-            catch (Exception ex)
-            {
-
-                throw;
-            }
         }
     }
 }

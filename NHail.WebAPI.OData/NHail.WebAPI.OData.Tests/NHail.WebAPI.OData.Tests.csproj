@@ -165,6 +165,10 @@
       <Project>{F1B440AF-7BB5-407B-BA2C-336CA0CC2876}</Project>
       <Name>NHail.WebAPI.OData</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Project1\PocoProject.csproj">
+      <Project>{a238746a-e90f-4a8c-b095-20494136c7ee}</Project>
+      <Name>PocoProject</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Microsoft.Bcl.Build.1.0.14\tools\Microsoft.Bcl.Build.targets" Condition="Exists('..\packages\Microsoft.Bcl.Build.1.0.14\tools\Microsoft.Bcl.Build.targets')" />

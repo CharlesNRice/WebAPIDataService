@@ -22,7 +22,7 @@ namespace NHail.WebAPI.OData.Tests
         {
             // Configure Web API for self-host. 
             var config = new HttpConfiguration();
-            config.Routes.MapHttpRoute(
+            config.Routes.MapODataServiceBatchRoute(
                 name: "DefaultOData",
                 routeTemplate: "api/odata/{*wildcard}",
                 defaults: new
@@ -31,6 +31,7 @@ namespace NHail.WebAPI.OData.Tests
                     action = "Get",
                     wildcard = RouteParameter.Optional
                 });
+            
             config.Routes.IgnoreRoute("ODataIgnore", "api/ODService/{*wildcard}");
             config.Formatters.Clear();
             config.Formatters.AddRange(ODataMediaTypeFormatters.Create());

@@ -17,6 +17,7 @@ using System.Web.Http.OData.Formatter;
 using System.Web.Http.OData.Query;
 using System.Web.Http.OData.Routing;
 using System.Web.Http.Results;
+using System.Web.Http.Routing;
 using System.Web.Mvc;
 using System.Web.Http.OData;
 using System.Web.UI.WebControls;
@@ -31,7 +32,14 @@ namespace NHail.WebAPI.OData.Controllers
 {
     public abstract class ODataServicesController<TSource> : ODataMetadataController, IServiceLocator
     {
-        public abstract string ODataRoute { get; }
+        public string ODataRoute
+        {
+            get
+            {
+                var routedata = Request.GetRouteData();
+                return routedata.Route.DataTokens["ID"].ToString();
+            }
+        }
         
         static ODataServicesController()
         {
@@ -250,6 +258,7 @@ namespace NHail.WebAPI.OData.Controllers
         protected virtual string GetODataPath()
         {
             var routedata = Request.GetRouteData();
+            
             var uriTemplate = new UriTemplate(routedata.Route.RouteTemplate);
             var baseUri = new Uri(Request.RequestUri.Scheme + "://" +
                                   Request.RequestUri.Authority +

@@ -16,10 +16,5 @@ namespace NHail.WebAPI.OData.Tests.Controllers
         {
             return ProcessRequest();
         }
-
-        public override string ODataRoute
-        {
-            get { return "DefaultOData"; }
-        }
     }
 }

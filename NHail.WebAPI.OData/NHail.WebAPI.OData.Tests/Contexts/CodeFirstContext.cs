@@ -7,8 +7,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-//using NHail.WebAPI.OData.Tests.CodeFirstPocos;
-using Pocos;
+using NHail.WebAPI.OData.Tests.CodeFirstPocos;
 
 namespace NHail.WebAPI.OData.Tests.Contexts
 {

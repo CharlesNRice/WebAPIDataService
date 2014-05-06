@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.Entity;
 using System.Data.Entity.Core.EntityClient;
+using System.Data.Entity.Core.Metadata.Edm;
 using System.Data.Entity.Core.Objects;
 using System.Data.Entity.Infrastructure;
 using System.IO;
@@ -12,14 +13,16 @@ using System.Web;
 using System.Xml;
 using Microsoft.Data.Edm;
 using Microsoft.Data.Edm.Csdl;
-using Microsoft.Data.Edm.Validation;
 using NHail.WebAPI.OData.Interfaces;
+using EdmError = Microsoft.Data.Edm.Validation.EdmError;
 
 namespace NHail.WebAPI.OData
 {
     //https://gist.github.com/dariusclay/8673940
     //http://stackoverflow.com/questions/22711496/entityframework-model-first-metadata-for-breezejs
     //https://gist.github.com/raghuramn/5864013
+
+    // would recommend inheriting from this class and build a caching routine around it then replace it in the ServiceLoctorConfiguration
     public class DbContextEdmModel : IEdmModelFactory
     {
         private const string CsdlFileExtension = ".csdl";
@@ -89,6 +92,8 @@ namespace NHail.WebAPI.OData
                 return null;
             }
 
+            LoadMetaData(dbContext);
+
             try
             {
                 return CodeFistModel(dbContext);
@@ -98,6 +103,20 @@ namespace NHail.WebAPI.OData
             }
             var objContext = (IObjectContextAdapter) source;
             return NotCodeFirstModel<TSource>(objContext);
+        }
+
+        private void LoadMetaData(DbContext context)
+        {
+            // have to generate a queryable to force OCSpace to load.  
+            //  This will throw exception but will still load OCSpace
+            //     Wish there was a better way but the cost of loading 
+            //     an type from a string from metadata and using set on that 
+            //     is more time consuming then just catching the exception
+            try
+            {
+                var query = context.Set(typeof(object)).AsNoTracking();
+            }
+            catch {}
         }
     }
 }

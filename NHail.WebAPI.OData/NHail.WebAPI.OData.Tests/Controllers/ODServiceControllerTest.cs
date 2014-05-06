@@ -21,10 +21,9 @@ using Microsoft.Owin.Hosting;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NHail.WebAPI.OData;
 using NHail.WebAPI.OData.Controllers;
-//using NHail.WebAPI.OData.Tests.CodeFirstPocos;
+using NHail.WebAPI.OData.Tests.CodeFirstPocos;
 using NHail.WebAPI.OData.Tests.Contexts;
 using Newtonsoft.Json.Linq;
-using Pocos;
 
 namespace NHail.WebAPI.OData.Tests.Controllers
 {

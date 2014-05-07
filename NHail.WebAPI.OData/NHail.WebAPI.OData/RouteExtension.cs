@@ -43,7 +43,7 @@ namespace NHail.WebAPI.OData
                                                            HttpMessageHandler handler)
         {
             var route = routes.MapHttpRoute(name, routeTemplate, defaults, constraints, handler);
-            route.DataTokens.Add("ID", name);
+            route.DataTokens.Add("RouteId", name);
             return route;
         }
     }

@@ -32,12 +32,12 @@ namespace NHail.WebAPI.OData.Controllers
 {
     public abstract class ODataServicesController<TSource> : ODataMetadataController, IServiceLocator
     {
-        public string ODataRoute
+        public virtual string ODataRoute
         {
             get
             {
                 var routedata = Request.GetRouteData();
-                return routedata.Route.DataTokens["ID"].ToString();
+                return routedata.Route.DataTokens["RouteId"].ToString();
             }
         }
         
@@ -57,7 +57,7 @@ namespace NHail.WebAPI.OData.Controllers
             ServiceLoctorConfiguration<IAssembliesResolver>(() => new DefaultAssembliesResolver());
             
             // Default for the odata query
-            oDataQuerySettings = new ODataQuerySettings();
+            ODataQuerySettings = new ODataQuerySettings();
         }
 
         protected ODataServicesController()
@@ -68,7 +68,7 @@ namespace NHail.WebAPI.OData.Controllers
             _currentDataSource = new Lazy<TSource>(CreateDataSource, LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
-        protected static ODataQuerySettings oDataQuerySettings { get; private set; }
+        protected static ODataQuerySettings ODataQuerySettings { get; private set; }
 
         private static readonly RuntimeMethodHandle _processRequest;
 
@@ -628,7 +628,7 @@ namespace NHail.WebAPI.OData.Controllers
                 var queryOptions = new ODataQueryOptions(queryContext, Request);
 
                 //ToDo this does the default Web API filtering but would like to get more control over it
-                query = queryOptions.ApplyTo(query, new ODataQuerySettings(oDataQuerySettings));
+                query = queryOptions.ApplyTo(query, new ODataQuerySettings(ODataQuerySettings));
 
 
                 return new ODataHttpActionResult(this, query, contentType,

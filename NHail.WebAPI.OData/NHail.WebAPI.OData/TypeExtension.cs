@@ -20,15 +20,11 @@ namespace NHail.WebAPI.OData
         /// <returns>The element type</returns> 
         public static Type GetQueryElementType(this Type type)
         {
-            Type ienum = FindIEnumerable(type);
-            if (ienum == null)
-            {
-                //If type is not IEnumerable<T>, then return type 
-                return type;
-            }
+            var ienum = FindIEnumerable(type);
 
             //If type is IEnumerable<T>, then return T 
-            return ienum.GetGenericArguments()[0];
+            return ienum == null ? type : ienum.GetGenericArguments()[0];
+
         }
 
         /// <summary> 
@@ -36,7 +32,7 @@ namespace NHail.WebAPI.OData
         /// </summary> 
         /// <param name="seqType">The type</param> 
         /// <returns>T if seqType is IEnumerable<T></returns> 
-        static Type FindIEnumerable(Type seqType)
+        public static Type FindIEnumerable(Type seqType)
         {
             if (seqType == null || seqType == typeof(string))
             {
@@ -50,26 +46,22 @@ namespace NHail.WebAPI.OData
 
             if (seqType.IsGenericType)
             {
-                foreach (Type arg in seqType.GetGenericArguments())
+                foreach (
+                    var ienum in
+                        seqType.GetGenericArguments()
+                               .Select(arg => typeof (IEnumerable<>).MakeGenericType(arg))
+                               .Where(ienum => ienum.IsAssignableFrom(seqType)))
                 {
-                    Type ienum = typeof(IEnumerable<>).MakeGenericType(arg);
-                    if (ienum.IsAssignableFrom(seqType))
-                    {
-                        return ienum;
-                    }
+                    return ienum;
                 }
             }
 
-            Type[] ifaces = seqType.GetInterfaces();
+            var ifaces = seqType.GetInterfaces();
             if (ifaces.Length > 0)
             {
-                foreach (Type iface in ifaces)
+                foreach (var ienum in ifaces.Select(FindIEnumerable).Where(ienum => ienum != null))
                 {
-                    Type ienum = FindIEnumerable(iface);
-                    if (ienum != null)
-                    {
-                        return ienum;
-                    }
+                    return ienum;
                 }
             }
 

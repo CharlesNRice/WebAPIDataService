@@ -13,6 +13,7 @@ using System.Web;
 using System.Xml;
 using Microsoft.Data.Edm;
 using Microsoft.Data.Edm.Csdl;
+using Microsoft.Data.Edm.Library;
 using NHail.WebAPI.OData.Interfaces;
 using EdmError = Microsoft.Data.Edm.Validation.EdmError;
 
@@ -94,15 +95,32 @@ namespace NHail.WebAPI.OData
 
             LoadMetaData(dbContext);
 
+            IEdmModel model = null;
             try
             {
-                return CodeFistModel(dbContext);
+                model = CodeFistModel(dbContext);
             }
             catch (NotSupportedException)
             {
             }
-            var objContext = (IObjectContextAdapter) source;
-            return NotCodeFirstModel<TSource>(objContext);
+            if (model == null)
+            {
+                var objContext = (IObjectContextAdapter) source;
+                model = NotCodeFirstModel<TSource>(objContext);
+            }
+            return model;
+        }
+
+        private IEdmModel AddFunctions(IEdmModel model)
+        {
+            if (model != null)
+            {
+                var edmModel = new Microsoft.Data.Edm.Library.EdmModel();
+                var iEdmEntityContainer = model.EntityContainers().Single();
+                var container = new EdmEntityContainer(iEdmEntityContainer.Namespace, iEdmEntityContainer.Name);
+
+            }
+            return model;
         }
 
         private void LoadMetaData(DbContext context)

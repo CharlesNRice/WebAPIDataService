@@ -124,6 +124,19 @@ namespace NHail.WebAPI.OData.Tests.Controllers
         }
 
         [TestMethod]
+        public async Task CheckValue()
+        {
+            var response =
+                await
+                _httpClient.GetAsync(ServiceAddress +
+                                     "Customers('APP001')/SalesOrderMasters(1)/SalesOrderTransactions(1)/Item/$value");
+            Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.IsTrue(content == "ITEM1");
+        }
+
+        [TestMethod]
         public async Task CheckProperty()
         {
             var response =

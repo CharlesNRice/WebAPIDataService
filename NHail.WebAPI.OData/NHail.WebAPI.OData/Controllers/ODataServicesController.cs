@@ -647,7 +647,7 @@ namespace NHail.WebAPI.OData.Controllers
         }
 
         // have just system type use IEnumerable to create the first one
-        private object FirstOrDefault(IQueryable queryable)
+        private static object FirstOrDefault(IQueryable queryable)
         {
             var enumerator = queryable.GetEnumerator();
             {

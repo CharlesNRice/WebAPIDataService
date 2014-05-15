@@ -42,9 +42,11 @@ namespace NHail.WebAPI.OData
                                                            object defaults, object constraints,
                                                            HttpMessageHandler handler)
         {
-            // need to wrap it because sometimes DataTokens is null
-            var route = new ODataRouteWrapper(routes.MapHttpRoute(name, routeTemplate, defaults, constraints, handler));
-            route.DataTokens.Add("RouteId", name);
+            var route = routes.CreateRoute(routeTemplate, new HttpRouteValueDictionary(defaults),
+                                           new HttpRouteValueDictionary(constraints),
+                                           new HttpRouteValueDictionary() { { "RouteId", name } },
+                                           handler);
+            routes.Add(name, route);
             return route;
         }
     }
